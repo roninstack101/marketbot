@@ -6,6 +6,7 @@ Task endpoints:
   DELETE /tasks/{id}       Cancel a pending task
 """
 import uuid
+from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,9 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models.task import Task
-from app.schemas.task import TaskCreate, TaskResponse, TaskStatusResponse
-from app.worker.tasks import execute_task
+from app.models.task import Approval, Task
+from app.schemas.task import TaskCreate, TaskResponse, TaskStatusResponse, UserInputRequest
+from app.worker.tasks import execute_task, resume_task
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/tasks", tags=["Tasks"])
@@ -89,6 +90,54 @@ async def get_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+
+@router.post("/{task_id}/respond", response_model=TaskStatusResponse)
+async def respond_to_task(
+    task_id: str,
+    body: UserInputRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Submit the user's answer to an ask_user step.
+    Stores the answer and resumes task execution.
+    """
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.status != "waiting_for_input":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Task is not waiting for input (status: '{task.status}').",
+        )
+
+    approval = (
+        await db.execute(
+            select(Approval).where(
+                Approval.task_id == task_id,
+                Approval.action_type == "user_input",
+                Approval.status == "pending",
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="No pending user input request found")
+
+    approval.status = "approved"
+    approval.action_payload = {**approval.action_payload, "answer": body.answer}
+    approval.resolved_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    resume_task.delay(task_id=task_id, approved_by="user")
+
+    log.info("user_input_received", task_id=task_id)
+    return TaskStatusResponse(
+        id=task_id,
+        status="running",
+        message="Answer received. Task is resuming.",
+    )
 
 
 @router.delete("/{task_id}", response_model=TaskStatusResponse)

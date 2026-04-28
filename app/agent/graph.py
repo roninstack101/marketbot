@@ -25,7 +25,7 @@ from app.agent.state import AgentState
 def route_after_executor(state: AgentState) -> str:
     status = state.get("status", "running")
 
-    if status in ("pending_approval", "rejected", "failed"):
+    if status in ("pending_approval", "waiting_for_input", "rejected", "failed"):
         return "end"
 
     plan = state.get("plan", [])

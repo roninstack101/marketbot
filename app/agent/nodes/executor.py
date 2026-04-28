@@ -10,7 +10,12 @@ import structlog
 from app.agent.llm_client import active_model
 from app.agent.llm_router import route_llm
 from app.agent.state import AgentState, StepResult
-from app.safety.approval import check_approval_status, create_approval_request
+from app.safety.approval import (
+    check_approval_status,
+    create_approval_request,
+    create_user_input_request,
+    get_user_input_answer,
+)
 from app.tools import TOOL_REGISTRY
 
 log = structlog.get_logger(__name__)
@@ -58,6 +63,41 @@ async def executor_node(state: AgentState) -> dict:
         step=step_number,
         tool=tool_name,
     )
+
+    # ── Ask-user gate ────────────────────────────────────────────────────────
+    if tool_name == "ask_user":
+        question = step.get("tool_input", {}).get("question", "Please provide more information.")
+
+        answer = await get_user_input_answer(task_id, step_number)
+        if answer is not None:
+            log.info("ask_user_answered", task_id=task_id, step=step_number)
+            result = StepResult(
+                step_number=step_number,
+                tool_name=tool_name,
+                status="success",
+                output=answer,
+                error=None,
+            )
+            final_output = state.get("final_output", "")
+            return {
+                "step_results": [result],
+                "current_step_idx": current_idx + 1,
+                "final_output": final_output,
+                "pending_approval": None,
+            }
+
+        input_id = await create_user_input_request(task_id, step_number, question)
+        log.info("ask_user_waiting", task_id=task_id, step=step_number, input_id=input_id)
+        return {
+            "status": "waiting_for_input",
+            "pending_approval": {
+                "approval_id": input_id,
+                "step_number": step_number,
+                "action_type": "user_input",
+                "action_payload": {"question": question},
+                "action_summary": question,
+            },
+        }
 
     # ── Safety gate ──────────────────────────────────────────────────────────
     if step.get("requires_approval", False):

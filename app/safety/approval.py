@@ -101,6 +101,71 @@ async def check_approval_status(
     return "approved"
 
 
+async def create_user_input_request(
+    task_id: str,
+    step_number: int,
+    question: str,
+) -> str:
+    """
+    Persist a user_input Approval record and return its ID.
+    Sets the parent Task status to 'waiting_for_input'.
+    """
+    async with get_async_db() as session:
+        existing = (
+            await session.execute(
+                select(Approval).where(
+                    Approval.task_id == task_id,
+                    Approval.action_type == "user_input",
+                    Approval.status == "pending",
+                )
+            )
+        ).scalar_one_or_none()
+
+        if existing:
+            return existing.id
+
+        approval = Approval(
+            id=str(uuid.uuid4()),
+            task_id=task_id,
+            action_type="user_input",
+            action_payload={"question": question, "step_number": step_number},
+            action_summary=question,
+            status="pending",
+        )
+        session.add(approval)
+
+        await session.execute(
+            update(Task).where(Task.id == task_id).values(status="waiting_for_input")
+        )
+
+        await session.flush()
+        input_id = approval.id
+
+    log.info("user_input_requested", task_id=task_id, input_id=input_id)
+    return input_id
+
+
+async def get_user_input_answer(task_id: str, step_number: int) -> Optional[str]:
+    """
+    Returns the user's answer for an ask_user step if it has been submitted,
+    otherwise None.
+    """
+    async with get_async_db() as session:
+        row = (
+            await session.execute(
+                select(Approval).where(
+                    Approval.task_id == task_id,
+                    Approval.action_type == "user_input",
+                    Approval.status == "approved",
+                )
+            )
+        ).scalar_one_or_none()
+
+    if row and row.action_payload.get("step_number") == step_number:
+        return row.action_payload.get("answer")
+    return None
+
+
 def resolve_approval_sync(
     approval_id: str,
     decision: str,

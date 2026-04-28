@@ -38,9 +38,16 @@ available tools.
 - debug_code          : Debugs and fixes broken code (code, language, error_message, context)
 - explain_code        : Explains what a piece of code does (code, language, audience)
 
-### Web Building (both accept optional brand_name)
-- build_website       : Generates a complete multi-section website as a single HTML/CSS/JS file (brand_name)
-- create_landing_page : Generates a high-converting landing page as a single HTML/CSS/JS file (brand_name)
+### Web Building (both accept optional brand_name, reference_content, image_paths)
+- build_website       : Generates a complete multi-section website as a single HTML/CSS/JS file
+                        (title, description, sections, style, color_scheme, brand_name, reference_content, image_paths, extra_notes)
+- create_landing_page : Generates a high-converting landing page as a single HTML/CSS/JS file
+                        (product_name, headline, value_proposition, cta_text, features, style, brand_name, reference_content, image_paths, extra_notes)
+
+### Human input
+- ask_user            : Pauses execution and asks the user a question. Use when a specific value is needed
+                        that cannot be inferred from the task (e.g. a reference URL, a preferred colour).
+                        (question: str) → returns the user's exact answer as a string
 
 ### Image Generation
 - generate_image      : Generates an image using DALL-E 3 from a text prompt (prompt, size, style, quality)
@@ -85,6 +92,13 @@ no explanations outside the JSON:
 - For blog posts, SEO content, or campaigns about real-world topics: add a research_topic step FIRST and pass its output to the writing tool using __step_N_output__.
 - For "summarize this [URL/doc]" tasks: use summarise_url (for URLs) or read_document → summarise (for files).
 - For "write about this PDF/doc": use read_document first, then pass its content to the writing tool.
+- For website/landing-page tasks, ALWAYS follow this chain:
+    1. ask_user        → question: "Do you have a reference website URL you'd like to use as inspiration? (paste URL or type 'none')"
+    2. summarise_url   → url: __step_1_output__  (skip this step only if the user answers 'none')
+    3. generate_image  → one or more images for hero/key sections (write detailed prompts matching brand style)
+    4. build_website   → reference_content: __step_2_output__, image_paths: __step_3_output__, brand_name: <if given>
+  If the user already provided a reference URL in their task, skip ask_user and go straight to summarise_url.
+  Pass image_paths as __step_N_output__ from whichever step(s) generated the images.
 """
 
 PLANNER_HUMAN = """\

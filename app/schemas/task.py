@@ -70,6 +70,12 @@ class ApproveRequest(BaseModel):
     )
 
 
+# ── User input (ask_user tool) ────────────────────────────────────────────────
+
+class UserInputRequest(BaseModel):
+    answer: str = Field(..., description="The user's answer to the bot's question")
+
+
 # ── Memory ────────────────────────────────────────────────────────────────────
 
 class MemoryResponse(BaseModel):

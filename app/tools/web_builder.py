@@ -2,6 +2,7 @@
 Website and web-page generation tools.
 The LLM produces complete, self-contained HTML/CSS/JS files.
 """
+import base64
 import json
 import os
 import re
@@ -52,6 +53,45 @@ def _slugify(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
 
 
+def _extract_image_data_uris(image_paths_raw: str) -> list[str]:
+    """
+    Parse generate_image JSON output(s) or comma-separated file paths into
+    base64 data URIs ready to embed in HTML.
+    """
+    if not image_paths_raw:
+        return []
+
+    paths: list[str] = []
+    # Try JSON first (single generate_image output or a list)
+    stripped = image_paths_raw.strip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        try:
+            parsed = json.loads(stripped)
+            if isinstance(parsed, dict):
+                parsed = [parsed]
+            for item in parsed:
+                fp = item.get("file_path") or item.get("path", "")
+                if fp:
+                    paths.append(fp)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+    if not paths:
+        paths = [p.strip() for p in image_paths_raw.split(",") if p.strip()]
+
+    data_uris: list[str] = []
+    for p in paths:
+        try:
+            raw = Path(p).read_bytes()
+            ext = Path(p).suffix.lstrip(".").lower() or "png"
+            mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
+            data_uris.append(f"data:{mime};base64,{base64.b64encode(raw).decode()}")
+        except OSError:
+            pass
+
+    return data_uris
+
+
 def _save_html(subfolder: str, filename: str, html: str) -> str:
     out_dir = _OUTPUT_DIR / subfolder
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -67,6 +107,8 @@ async def build_website(
     style: str = "modern minimalist",
     color_scheme: str = "blue and white",
     brand_name: str = "",
+    reference_content: str = "",
+    image_paths: str = "",
     extra_notes: str = "",
 ) -> str:
     """
@@ -79,8 +121,10 @@ async def build_website(
                       or a comma-separated string.
         style:        Visual style (modern minimalist | corporate | bold creative | etc.).
         color_scheme: Primary colors (e.g. "dark navy and gold").
-        brand_name:   Brand slug to apply stored brand voice (e.g. "nike").
-        extra_notes:  Any additional design or content requirements.
+        brand_name:        Brand slug to apply stored brand voice (e.g. "nike").
+        reference_content: Text extracted from a reference site (output of summarise_url).
+        image_paths:       JSON from generate_image steps or comma-separated file paths.
+        extra_notes:       Any additional design or content requirements.
 
     Returns:
         JSON string with the saved file path and a summary.
@@ -97,13 +141,24 @@ async def build_website(
 
     system = (brand_block + "\n\n" + _BUILD_WEBSITE_SYSTEM) if brand_block else _BUILD_WEBSITE_SYSTEM
 
+    reference_block = (
+        f"\n\n## Reference site (use for structure/content inspiration — do not copy verbatim)\n{reference_content[:3000]}"
+        if reference_content else ""
+    )
+
+    data_uris = _extract_image_data_uris(image_paths)
+    image_block = ""
+    if data_uris:
+        tags = "\n".join(f'<img src="{uri}" alt="site image {i+1}">' for i, uri in enumerate(data_uris))
+        image_block = f"\n\n## Generated images — embed these exactly as-is in appropriate sections:\n{tags}"
+
     human = f"""\
 Site title: {title}
 Description: {description}
 Sections (in order): {', '.join(sections)}
 Visual style: {style}
 Color scheme: {color_scheme}
-Extra notes: {extra_notes or 'None'}
+Extra notes: {extra_notes or 'None'}{reference_block}{image_block}
 
 Build the complete website HTML now.
 """
@@ -142,6 +197,8 @@ async def create_landing_page(
     features: list | str = "",
     style: str = "modern",
     brand_name: str = "",
+    reference_content: str = "",
+    image_paths: str = "",
     extra_notes: str = "",
 ) -> str:
     """
@@ -174,6 +231,17 @@ async def create_landing_page(
 
     system = (brand_block + "\n\n" + _LANDING_PAGE_SYSTEM) if brand_block else _LANDING_PAGE_SYSTEM
 
+    reference_block = (
+        f"\n\n## Reference site (use for structure/content inspiration — do not copy verbatim)\n{reference_content[:3000]}"
+        if reference_content else ""
+    )
+
+    data_uris = _extract_image_data_uris(image_paths)
+    image_block = ""
+    if data_uris:
+        tags = "\n".join(f'<img src="{uri}" alt="product image {i+1}">' for i, uri in enumerate(data_uris))
+        image_block = f"\n\n## Generated images — embed these exactly as-is in appropriate sections:\n{tags}"
+
     human = f"""\
 Product name: {product_name}
 Hero headline: {headline}
@@ -182,7 +250,7 @@ CTA button text: {cta_text}
 CTA URL: {cta_url}
 Key features / benefits: {', '.join(features) if features else 'Generate 3 compelling features'}
 Visual style: {style}
-Extra notes: {extra_notes or 'None'}
+Extra notes: {extra_notes or 'None'}{reference_block}{image_block}
 
 Generate the high-converting landing page HTML now.
 """
