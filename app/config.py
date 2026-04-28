@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     llm_model_fast: str = ""          # Cheap & quick   (short posts, simple tasks)
 
     # ── LLM Router ────────────────────────────────────────────────────────────
-    llm_router_enabled: bool = False  # Enable AI-assisted tier selection
+    llm_router_enabled: bool = True   # Enable AI-assisted tier selection
     llm_router_model: str = ""        # Model used for routing decisions (defaults to llm_model_fast)
 
     # ── Web search ────────────────────────────────────────────────────────────
