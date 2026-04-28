@@ -7,6 +7,8 @@ import re
 
 import structlog
 
+from app.agent.llm_client import active_model
+from app.agent.llm_router import route_llm
 from app.agent.state import AgentState, StepResult
 from app.safety.approval import check_approval_status, create_approval_request
 from app.tools import TOOL_REGISTRY
@@ -121,9 +123,17 @@ async def executor_node(state: AgentState) -> dict:
             "errors": [error_msg],
         }
 
+    # ── LLM routing ─────────────────────────────────────────────────────────
+    routed_model = await route_llm(
+        tool_name=tool_name,
+        tool_input=resolved_input,
+        task_description=state.get("user_task", ""),
+    )
+    ctx_token = active_model.set(routed_model) if routed_model else None
+
     try:
         output = await tool_fn(**resolved_input)
-        log.info("step_success", task_id=task_id, step=step_number, tool=tool_name)
+        log.info("step_success", task_id=task_id, step=step_number, tool=tool_name, model=routed_model or "default")
         result = StepResult(
             step_number=step_number,
             tool_name=tool_name,
@@ -140,6 +150,9 @@ async def executor_node(state: AgentState) -> dict:
             output=None,
             error=str(exc),
         )
+    finally:
+        if ctx_token is not None:
+            active_model.reset(ctx_token)
 
     # Compose final_output from the last successful content-producing step
     final_output = state.get("final_output", "")

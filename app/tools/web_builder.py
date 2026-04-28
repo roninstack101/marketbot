@@ -66,6 +66,7 @@ async def build_website(
     sections: list | str,
     style: str = "modern minimalist",
     color_scheme: str = "blue and white",
+    brand_name: str = "",
     extra_notes: str = "",
 ) -> str:
     """
@@ -78,6 +79,7 @@ async def build_website(
                       or a comma-separated string.
         style:        Visual style (modern minimalist | corporate | bold creative | etc.).
         color_scheme: Primary colors (e.g. "dark navy and gold").
+        brand_name:   Brand slug to apply stored brand voice (e.g. "nike").
         extra_notes:  Any additional design or content requirements.
 
     Returns:
@@ -86,7 +88,14 @@ async def build_website(
     if isinstance(sections, str):
         sections = [s.strip() for s in sections.split(",")]
 
-    log.info("build_website", title=title, sections=sections)
+    log.info("build_website", title=title, sections=sections, brand=brand_name or "none")
+
+    brand_block = ""
+    if brand_name:
+        from app.brand.store import get_brand_voice_prompt
+        brand_block = await get_brand_voice_prompt(brand_name)
+
+    system = (brand_block + "\n\n" + _BUILD_WEBSITE_SYSTEM) if brand_block else _BUILD_WEBSITE_SYSTEM
 
     human = f"""\
 Site title: {title}
@@ -100,7 +109,7 @@ Build the complete website HTML now.
 """
     html = await call_llm(
         [
-            {"role": "system", "content": _BUILD_WEBSITE_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": human},
         ],
         temperature=0.4,
@@ -132,6 +141,7 @@ async def create_landing_page(
     cta_url: str = "#",
     features: list | str = "",
     style: str = "modern",
+    brand_name: str = "",
     extra_notes: str = "",
 ) -> str:
     """
@@ -155,7 +165,14 @@ async def create_landing_page(
     elif not features:
         features = []
 
-    log.info("create_landing_page", product=product_name)
+    log.info("create_landing_page", product=product_name, brand=brand_name or "none")
+
+    brand_block = ""
+    if brand_name:
+        from app.brand.store import get_brand_voice_prompt
+        brand_block = await get_brand_voice_prompt(brand_name)
+
+    system = (brand_block + "\n\n" + _LANDING_PAGE_SYSTEM) if brand_block else _LANDING_PAGE_SYSTEM
 
     human = f"""\
 Product name: {product_name}
@@ -171,7 +188,7 @@ Generate the high-converting landing page HTML now.
 """
     html = await call_llm(
         [
-            {"role": "system", "content": _LANDING_PAGE_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": human},
         ],
         temperature=0.4,

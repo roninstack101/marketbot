@@ -34,6 +34,7 @@ async def generate_campaign(
     goal: str,
     audience: str,
     tone: str = "professional",
+    brand_name: str = "",
     extra_notes: str = "",
 ) -> str:
     """
@@ -44,12 +45,20 @@ async def generate_campaign(
         goal:        Campaign objective (e.g. "drive sign-ups", "announce sale").
         audience:    Target audience description.
         tone:        Desired tone (professional | friendly | urgent | playful).
+        brand_name:  Brand slug to apply stored brand voice (e.g. "nike").
         extra_notes: Any additional context or constraints.
 
     Returns:
         JSON string with all campaign copy fields.
     """
-    log.info("generate_campaign", product=product, goal=goal, tone=tone)
+    log.info("generate_campaign", product=product, goal=goal, tone=tone, brand=brand_name or "none")
+
+    brand_block = ""
+    if brand_name:
+        from app.brand.store import get_brand_voice_prompt
+        brand_block = await get_brand_voice_prompt(brand_name)
+
+    system = (brand_block + "\n\n" + CAMPAIGN_SYSTEM) if brand_block else CAMPAIGN_SYSTEM
 
     human_prompt = f"""\
 Product / Service: {product}
@@ -63,7 +72,7 @@ Generate the campaign now.
 
     result = await call_llm_json(
         [
-            {"role": "system", "content": CAMPAIGN_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": human_prompt},
         ],
         temperature=0.5,

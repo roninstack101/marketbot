@@ -6,13 +6,19 @@ Thin wrapper around litellm that adds:
 """
 import json
 import os
-from typing import Any
+from contextvars import ContextVar
+from typing import Any, Optional
 
 import litellm
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import get_settings
 from app.logging_config import get_logger
+
+# Set by the executor before each tool call via llm_router.active_model.
+# call_llm reads this so every tool automatically uses the routed model
+# without needing its own model parameter.
+active_model: ContextVar[Optional[str]] = ContextVar("active_model", default=None)
 
 log = get_logger(__name__)
 settings = get_settings()
@@ -42,7 +48,7 @@ async def call_llm(
     max_tokens: int | None = None,
 ) -> str:
     """Call the LLM and return the raw text content of the first choice."""
-    effective_model = model or settings.llm_model
+    effective_model = model or active_model.get() or settings.llm_model
 
     log.debug("llm_call", model=effective_model, message_count=len(messages))
 

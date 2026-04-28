@@ -50,6 +50,23 @@ class Settings(BaseSettings):
     llm_max_tokens: int = 4096
     llm_max_retries: int = 3
 
+    # ── LLM model tiers (for routing) ─────────────────────────────────────────
+    # Leave empty to fall back to llm_model for all tiers.
+    llm_model_strong: str = ""        # Best reasoning  (code, debugging, analysis)
+    llm_model_creative: str = ""      # Creative tasks  (marketing, web, long writing)
+    llm_model_fast: str = ""          # Cheap & quick   (short posts, simple tasks)
+
+    # ── LLM Router ────────────────────────────────────────────────────────────
+    llm_router_enabled: bool = False  # Enable AI-assisted tier selection
+    llm_router_model: str = ""        # Model used for routing decisions (defaults to llm_model_fast)
+
+    # ── Web search ────────────────────────────────────────────────────────────
+    tavily_api_key: str = ""          # Primary search provider (tavily.com)
+    serper_api_key: str = ""          # Fallback search provider (serper.dev)
+
+    # ── Document reader ───────────────────────────────────────────────────────
+    upload_dir: str = "./uploads"     # Where users place files for read_document
+
     # ── Image generation ──────────────────────────────────────────────────────
     openai_api_key: str = ""          # Required for generate_image (DALL-E 3)
     image_output_dir: str = "./output/images"

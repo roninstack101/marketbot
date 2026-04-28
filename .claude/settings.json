@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git *)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cd \"c:/Users/Yash suthar/OneDrive - World Goods Market Limited/Desktop/marketbot\" && git add -A && { git diff --cached --quiet || { git commit -m \"auto-save: $(date '+%Y-%m-%d %H:%M:%S')\" && git push origin main; }; } 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Pushing to GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}

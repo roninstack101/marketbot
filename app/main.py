@@ -14,13 +14,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.approvals import router as approvals_router
+from app.api.brands import router as brands_router
 from app.api.history import router as history_router
 from app.api.tasks import router as tasks_router
 from app.config import get_settings
 from app.database import async_engine
 from app.database import Base
 from app.logging_config import configure_logging
-from app.models import Task, Approval, Memory  # ensure models are registered
+from app.models import Task, Approval, Memory, BrandVoice  # ensure models are registered
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -58,6 +59,7 @@ app.add_middleware(
 app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(approvals_router, prefix="/api/v1")
 app.include_router(history_router, prefix="/api/v1")
+app.include_router(brands_router, prefix="/api/v1")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

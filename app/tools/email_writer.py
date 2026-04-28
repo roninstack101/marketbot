@@ -31,6 +31,7 @@ async def write_email(
     body_brief: str,
     tone: str = "professional",
     sender_name: str = "ClaudBot",
+    brand_name: str = "",
 ) -> str:
     """
     Draft an email using the LLM.
@@ -41,11 +42,19 @@ async def write_email(
         body_brief:    Key points to include in the body.
         tone:          professional | friendly | formal | casual.
         sender_name:   Name to sign the email with.
+        brand_name:    Brand slug to apply stored brand voice (e.g. "nike").
 
     Returns:
         Formatted email as plain text (Subject line + body).
     """
-    log.info("write_email", to=to, tone=tone)
+    log.info("write_email", to=to, tone=tone, brand=brand_name or "none")
+
+    brand_block = ""
+    if brand_name:
+        from app.brand.store import get_brand_voice_prompt
+        brand_block = await get_brand_voice_prompt(brand_name)
+
+    system = (brand_block + "\n\n" + EMAIL_WRITER_SYSTEM) if brand_block else EMAIL_WRITER_SYSTEM
 
     prompt = f"""\
 To: {to}
@@ -59,7 +68,7 @@ Draft the email now.
 
     content = await call_llm(
         [
-            {"role": "system", "content": EMAIL_WRITER_SYSTEM},
+            {"role": "system", "content": system},
             {"role": "user", "content": prompt},
         ],
         temperature=0.4,
