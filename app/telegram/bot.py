@@ -134,6 +134,7 @@ async def _finish_setup(chat_id: int, answers: dict, context: ContextTypes.DEFAU
     await save_user_memory(uid, f"Call the user '{answers['nickname']}'", category="nickname")
     await save_user_memory(uid, f"User's role is {answers['role']}", category="role")
     await save_user_memory(uid, f"Preferred tone and language: {answers['tone']}", category="preference")
+    await mark_onboarded(uid)   # permanent flag — won't ask again on /start
 
     await context.bot.send_message(
         chat_id=chat_id,
