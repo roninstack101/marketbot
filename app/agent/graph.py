@@ -105,6 +105,7 @@ async def run_agent(
         initial_state = AgentState(
             task_id=task_id,
             user_task=user_task,
+            user_id=user_id,
             plan=[],
             current_step_idx=0,
             memory_context="",
