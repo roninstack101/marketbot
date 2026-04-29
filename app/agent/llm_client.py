@@ -43,6 +43,17 @@ _FALLBACK_ERRORS = (
     litellm.APIConnectionError,
 )
 
+# Models that support extended thinking via extra_body
+_THINKING_MODELS = {"z-ai/glm4.7"}
+
+
+def _extra_body_for(model: str) -> dict | None:
+    """Return extra_body kwargs for models that support thinking mode."""
+    model_short = model.split("/")[-1]
+    if model_short in _THINKING_MODELS:
+        return {"chat_template_kwargs": {"enable_thinking": True, "clear_thinking": False}}
+    return None
+
 
 async def call_llm(
     messages: list[dict],
@@ -54,8 +65,8 @@ async def call_llm(
     """
     Call the LLM and return the raw text content of the first choice.
     Tries each model in the fallback chain on quota/rate-limit errors.
+    Automatically enables thinking mode for supported models (e.g. GLM-4.7).
     """
-    # Build the model list for this call
     if model:
         models = [model]
     else:
@@ -68,13 +79,19 @@ async def call_llm(
         try:
             log.debug("llm_call", model=attempt_model, message_count=len(messages))
 
-            response = await litellm.acompletion(
+            kwargs: dict = dict(
                 model=attempt_model,
                 messages=messages,
                 temperature=temperature if temperature is not None else settings.llm_temperature,
                 max_tokens=max_tokens or settings.llm_max_tokens,
                 num_retries=settings.llm_max_retries,
             )
+
+            extra = _extra_body_for(attempt_model)
+            if extra:
+                kwargs["extra_body"] = extra
+
+            response = await litellm.acompletion(**kwargs)
 
             content = response.choices[0].message.content or ""
             log.debug("llm_response", model=attempt_model, tokens=response.usage.total_tokens if response.usage else None)
