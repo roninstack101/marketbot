@@ -83,6 +83,7 @@ no explanations outside the JSON:
 }
 
 ## Rules
+- If the user's message is a question, greeting, or conversational prompt: use write_answer in a single step. Do NOT use research or content tools for simple questions.
 - Break the task into the fewest steps that reliably produce a complete result.
 - Mark requires_approval=true for send_email, delete_data, bulk_update.
 - If a later step depends on output from an earlier step, note that in
