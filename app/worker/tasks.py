@@ -35,7 +35,7 @@ def _update_task_sync(task_id: str, updates: dict) -> None:
     default_retry_delay=5,
     name="claudbot.execute_task",
 )
-def execute_task(self, task_id: str, user_task: str, created_by: str | None = None):
+def execute_task(self, task_id: str, user_task: str, created_by: str | None = None, user_id: str = ""):
     """
     Entry point for all new tasks.
     Runs the LangGraph graph and writes results back to the DB.
