@@ -35,11 +35,13 @@ if settings.google_api_key:
 litellm.set_verbose = False
 
 
-@retry(
-    stop=stop_after_attempt(settings.llm_max_retries),
-    wait=wait_exponential(multiplier=1, min=2, max=30),
-    reraise=True,
+_FALLBACK_ERRORS = (
+    litellm.RateLimitError,
+    litellm.ServiceUnavailableError,
+    litellm.APIConnectionError,
 )
+
+
 async def call_llm(
     messages: list[dict],
     *,
@@ -47,21 +49,41 @@ async def call_llm(
     temperature: float | None = None,
     max_tokens: int | None = None,
 ) -> str:
-    """Call the LLM and return the raw text content of the first choice."""
-    effective_model = model or active_model.get() or settings.llm_model
+    """
+    Call the LLM and return the raw text content of the first choice.
+    Tries each model in the fallback chain on quota/rate-limit errors.
+    """
+    # Build the model list for this call
+    if model:
+        models = [model]
+    else:
+        ctx = active_model.get()
+        models = ctx if ctx else [settings.llm_model]
 
-    log.debug("llm_call", model=effective_model, message_count=len(messages))
+    last_error: Exception | None = None
 
-    response = await litellm.acompletion(
-        model=effective_model,
-        messages=messages,
-        temperature=temperature if temperature is not None else settings.llm_temperature,
-        max_tokens=max_tokens or settings.llm_max_tokens,
-    )
+    for attempt_model in models:
+        try:
+            log.debug("llm_call", model=attempt_model, message_count=len(messages))
 
-    content = response.choices[0].message.content or ""
-    log.debug("llm_response", tokens=response.usage.total_tokens if response.usage else None)
-    return content
+            response = await litellm.acompletion(
+                model=attempt_model,
+                messages=messages,
+                temperature=temperature if temperature is not None else settings.llm_temperature,
+                max_tokens=max_tokens or settings.llm_max_tokens,
+                num_retries=settings.llm_max_retries,
+            )
+
+            content = response.choices[0].message.content or ""
+            log.debug("llm_response", model=attempt_model, tokens=response.usage.total_tokens if response.usage else None)
+            return content
+
+        except _FALLBACK_ERRORS as exc:
+            log.warning("llm_fallback", model=attempt_model, error=str(exc))
+            last_error = exc
+            continue
+
+    raise last_error or RuntimeError("No models available")
 
 
 async def call_llm_json(
