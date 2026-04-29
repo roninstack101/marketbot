@@ -185,6 +185,70 @@ async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.message.reply_text("Task cancelled. Send a new message to start fresh.")
 
 
+# ── User memory commands ──────────────────────────────────────────────────────
+
+async def cmd_remember(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Save a personal memory. Usage: /remember I prefer formal English"""
+    chat_id = update.effective_chat.id
+    text = " ".join(context.args).strip() if context.args else ""
+    if not text:
+        await update.message.reply_text(
+            "Usage: /remember <anything>\n"
+            "Examples:\n"
+            "• /remember My name is Yash\n"
+            "• /remember I always want formal English\n"
+            "• /remember I work with Nike and Adidas brands"
+        )
+        return
+    await save_user_memory(str(chat_id), text)
+    await update.message.reply_text(f"✅ Remembered: {text}")
+
+
+async def cmd_myprofile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show all saved memories for this user."""
+    chat_id = update.effective_chat.id
+    memories = await get_user_memories(str(chat_id))
+    if not memories:
+        await update.message.reply_text(
+            "No memories saved yet.\nUse /remember <fact> to save something."
+        )
+        return
+
+    lines = [f"`{m['id'][:8]}` [{m['category']}] {m['memory']}" for m in memories]
+    text = "🧠 *Your memory profile:*\n\n" + "\n".join(lines)
+    text += "\n\nTo delete one: /forget <first 8 chars of ID>"
+    await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
+
+
+async def cmd_forget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Delete a specific memory. Usage: /forget <memory-id>"""
+    chat_id = update.effective_chat.id
+    if not context.args:
+        await update.message.reply_text("Usage: /forget <memory-id>\nSee IDs with /myprofile")
+        return
+
+    partial_id = context.args[0].strip()
+    memories = await get_user_memories(str(chat_id))
+    match = next((m for m in memories if m["id"].startswith(partial_id)), None)
+
+    if not match:
+        await update.message.reply_text(f"No memory found with ID starting with `{partial_id}`", parse_mode=ParseMode.MARKDOWN)
+        return
+
+    deleted = await delete_user_memory(match["id"], str(chat_id))
+    if deleted:
+        await update.message.reply_text(f"🗑 Forgotten: {match['memory']}")
+    else:
+        await update.message.reply_text("Could not delete that memory.")
+
+
+async def cmd_clearprofile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clear all memories for this user."""
+    chat_id = update.effective_chat.id
+    count = await clear_user_memories(str(chat_id))
+    await update.message.reply_text(f"🗑 Cleared {count} memories. Starting fresh.")
+
+
 # ── Message handler ───────────────────────────────────────────────────────────
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
