@@ -8,11 +8,11 @@ settings = get_settings()
 _BASE = settings.bot_api_base_url.rstrip("/")
 
 
-async def submit_task(user_task: str, created_by: str = "telegram") -> str:
+async def submit_task(user_task: str, created_by: str = "telegram", user_id: str = "") -> str:
     async with httpx.AsyncClient(timeout=10) as client:
         r = await client.post(
             f"{_BASE}/tasks",
-            json={"user_task": user_task, "created_by": created_by},
+            json={"user_task": user_task, "created_by": created_by, "user_id": user_id},
         )
         r.raise_for_status()
         return r.json()["id"]
