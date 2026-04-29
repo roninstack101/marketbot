@@ -36,6 +36,7 @@ class AgentState(TypedDict):
     # ── Input ─────────────────────────────────────────────────────────────────
     task_id: str
     user_task: str
+    user_id: str                   # Telegram chat_id or any user identifier
 
     # ── Planning ──────────────────────────────────────────────────────────────
     plan: list[Step]
