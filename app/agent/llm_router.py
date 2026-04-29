@@ -144,18 +144,17 @@ async def _ai_route(
     tool_input: dict,
     task_description: str,
     default_tier: str,
-) -> str:
+) -> tuple[str, str]:
     """
-    Ask a cheap routing LLM whether to change the default tier.
-    Falls back to the default tier on any error.
+    Ask a cheap routing LLM to pick the best tier AND quality level.
+    Returns (tier, quality). Falls back to (default_tier, 'high') on any error.
     """
     from app.agent.llm_client import call_llm_json  # lazy import – avoids circular
 
-    # Truncate large values so the routing call stays cheap
     safe_input = {
         k: (str(v)[:150] + "…" if isinstance(v, str) and len(str(v)) > 150 else v)
         for k, v in tool_input.items()
-        if k not in ("code", "html")       # skip raw code/html blobs
+        if k not in ("code", "html")
     }
 
     human = f"""\
@@ -164,7 +163,7 @@ Default tier: {default_tier}
 Inputs: {json.dumps(safe_input, ensure_ascii=False)[:500]}
 Overall task: {task_description[:200] or 'not provided'}
 
-Should the tier stay as '{default_tier}' or change? Respond with JSON only.
+Pick the best tier and quality level. Respond with JSON only.
 """
     router_model = (
         settings.llm_router_model
@@ -181,26 +180,30 @@ Should the tier stay as '{default_tier}' or change? Respond with JSON only.
             model=router_model,
             temperature=0.0,
         )
-        chosen = result.get("tier", default_tier)
+        tier = result.get("tier", default_tier)
+        quality = result.get("quality", "high")
         reason = result.get("reason", "")
 
-        if chosen not in ("strong", "creative", "standard", "fast"):
-            log.warning("llm_router_invalid_tier", chosen=chosen, fallback=default_tier)
-            return default_tier
+        if tier not in ("strong", "creative", "standard", "fast"):
+            log.warning("llm_router_invalid_tier", tier=tier, fallback=default_tier)
+            tier = default_tier
 
-        if chosen != default_tier:
-            log.info(
-                "llm_router_override",
-                tool=tool_name,
-                default=default_tier,
-                chosen=chosen,
-                reason=reason,
-            )
-        return chosen
+        if quality not in ("high", "medium", "low"):
+            quality = "high"
+
+        log.info(
+            "llm_router_decision_ai",
+            tool=tool_name,
+            default_tier=default_tier,
+            chosen_tier=tier,
+            quality=quality,
+            reason=reason,
+        )
+        return tier, quality
 
     except Exception as exc:
         log.warning("llm_router_ai_failed", error=str(exc), fallback=default_tier)
-        return default_tier
+        return default_tier, "high"
 
 
 async def route_llm(
