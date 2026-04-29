@@ -109,19 +109,34 @@ Return ONLY a valid JSON object – no markdown fences, no explanation outside i
 """
 
 
-def _tier_to_models(tier: str) -> list[str]:
-    """Resolve a tier name to an ordered list of models (primary + fallbacks)."""
+def _tier_to_models(tier: str, quality: str = "high") -> list[str]:
+    """
+    Resolve a tier + quality level to an ordered list of models.
+
+    Models in the list are ordered best → cheapest. Quality controls the
+    starting position so cheap tasks skip expensive models entirely:
+      high   → start at index 0 (best model, full fallback chain)
+      medium → start at midpoint (skip top models, use mid-range + cheaper)
+      low    → start at last model (cheapest only)
+    """
     tier_lists = {
         "strong":   settings.llm_model_strong_list or settings.llm_model_list,
         "creative": settings.llm_model_creative_list or settings.llm_model_list,
         "standard": settings.llm_model_list,
         "fast":     settings.llm_model_fast_list or settings.llm_model_list,
     }
-    models = tier_lists.get(tier, settings.llm_model_list)
-    # Always ensure the default model is at the end as final fallback
+    models = list(tier_lists.get(tier, settings.llm_model_list))
+
+    # Ensure default model is always the final fallback
     if settings.llm_model not in models:
-        models = list(models) + [settings.llm_model]
-    return models
+        models.append(settings.llm_model)
+
+    if len(models) <= 1 or quality == "high":
+        return models
+
+    n = len(models)
+    start = (n // 2) if quality == "medium" else (n - 1)
+    return models[start:]
 
 
 async def _ai_route(
