@@ -70,6 +70,9 @@ TOOL_REGISTRY = {
     "store_data": store_data,
     "retrieve_data": retrieve_data,
     "delete_data": delete_data,                # requires approval
+
+    # ── General Q&A ────────────────────────────────────────────────────────────
+    "write_answer": write_answer,
 }
 
 __all__ = ["TOOL_REGISTRY"]
