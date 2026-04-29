@@ -180,9 +180,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Redo the onboarding at any time."""
+    """Explicitly redo the profile setup."""
     chat_id = update.effective_chat.id
     await clear_user_memories(str(chat_id))
+    await reset_onboarding(str(chat_id))
     _setup[chat_id] = {"step": 0, "answers": {}}
     await update.message.reply_text("Let's update your profile! Starting fresh.")
     await _ask_setup_question(chat_id, 0, context)
