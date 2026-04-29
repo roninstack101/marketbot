@@ -23,6 +23,7 @@ from app.tools.email_writer import send_email, write_email
 from app.tools.image_gen import generate_image
 from app.tools.storage import delete_data, retrieve_data, store_data
 from app.tools.web_builder import build_website, create_landing_page
+from app.tools.qa import write_answer
 
 TOOL_REGISTRY = {
     # ── Brand voice ────────────────────────────────────────────────────────────
