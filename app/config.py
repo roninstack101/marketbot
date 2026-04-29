@@ -51,10 +51,27 @@ class Settings(BaseSettings):
     llm_max_retries: int = 3
 
     # ── LLM model tiers (for routing) ─────────────────────────────────────────
+    # Comma-separated lists: first model is primary, rest are fallbacks.
     # Leave empty to fall back to llm_model for all tiers.
-    llm_model_strong: str = ""        # Best reasoning  (code, debugging, analysis)
-    llm_model_creative: str = ""      # Creative tasks  (marketing, web, long writing)
-    llm_model_fast: str = ""          # Cheap & quick   (short posts, simple tasks)
+    llm_model_strong: str = ""        # e.g. "openrouter/anthropic/claude-opus-4-5,openrouter/openai/gpt-4o"
+    llm_model_creative: str = ""      # e.g. "openrouter/anthropic/claude-sonnet-4-5,openrouter/openai/gpt-4o"
+    llm_model_fast: str = ""          # e.g. "openrouter/google/gemini-flash-1.5,openrouter/openai/gpt-4o-mini"
+
+    @property
+    def llm_model_strong_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_model_strong.split(",") if m.strip()]
+
+    @property
+    def llm_model_creative_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_model_creative.split(",") if m.strip()]
+
+    @property
+    def llm_model_fast_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_model_fast.split(",") if m.strip()]
+
+    @property
+    def llm_model_list(self) -> list[str]:
+        return [m.strip() for m in self.llm_model.split(",") if m.strip()]
 
     # ── LLM Router ────────────────────────────────────────────────────────────
     llm_router_enabled: bool = True   # Enable AI-assisted tier selection
