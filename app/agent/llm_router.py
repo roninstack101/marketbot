@@ -187,12 +187,12 @@ async def route_llm(
     tool_name: str,
     tool_input: dict,
     task_description: str = "",
-) -> Optional[str]:
+) -> Optional[list[str]]:
     """
-    Decide which LLM model to use for this tool call.
+    Decide which LLM models to use for this tool call.
 
     Returns:
-        Model string (e.g. 'openrouter/anthropic/claude-opus-4'),
+        Ordered list of model strings to try (primary first, fallbacks after),
         or None if the tool doesn't use an LLM (caller should skip setting context).
     """
     default_tier = TOOL_TIERS.get(tool_name)
@@ -210,6 +210,6 @@ async def route_llm(
     else:
         tier = default_tier
 
-    model = _tier_to_model(tier)
-    log.info("llm_router_decision", tool=tool_name, tier=tier, model=model)
-    return model
+    models = _tier_to_models(tier)
+    log.info("llm_router_decision", tool=tool_name, tier=tier, primary=models[0], fallbacks=len(models) - 1)
+    return models
