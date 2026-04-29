@@ -271,7 +271,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     # New task
     await update.message.reply_text("⏳ Working on it…")
     try:
-        task_id = await submit_task(text, created_by=str(chat_id))
+        task_id = await submit_task(text, created_by=str(chat_id), user_id=str(chat_id))
         _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": None}
         asyncio.create_task(_poll_task(chat_id, task_id, context))
     except Exception as exc:
