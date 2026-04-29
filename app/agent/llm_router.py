@@ -73,6 +73,9 @@ TOOL_TIERS: dict[str, Optional[str]] = {
     # ── Image (calls OpenAI directly, not routed) ───────────────────────────
     "generate_image":      None,
 
+    # ── General Q&A ─────────────────────────────────────────────────────────
+    "write_answer":        "standard",
+
     # ── Human-in-the-loop (no LLM) ──────────────────────────────────────────
     "ask_user":            None,
 
