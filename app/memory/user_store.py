@@ -64,14 +64,49 @@ async def delete_user_memory(memory_id: str, user_id: str) -> bool:
 
 
 async def clear_user_memories(user_id: str) -> int:
-    """Delete all memories for a user. Returns count deleted."""
+    """Delete all memories for a user except the onboarding flag. Returns count deleted."""
     async with get_async_db() as session:
         result = await session.execute(
-            delete(UserMemory).where(UserMemory.user_id == user_id)
+            delete(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.category != "onboarded",   # preserve the join flag
+            )
         )
     count = result.rowcount
     log.info("user_memories_cleared", user_id=user_id, count=count)
     return count
+
+
+async def is_onboarded(user_id: str) -> bool:
+    """Return True if the user has completed onboarding at least once."""
+    async with get_async_db() as session:
+        row = (
+            await session.execute(
+                select(UserMemory).where(
+                    UserMemory.user_id == user_id,
+                    UserMemory.category == "onboarded",
+                )
+            )
+        ).scalar_one_or_none()
+    return row is not None
+
+
+async def mark_onboarded(user_id: str) -> None:
+    """Persist the onboarding-complete flag for this user."""
+    if await is_onboarded(user_id):
+        return
+    await save_user_memory(user_id, "setup_complete", category="onboarded")
+
+
+async def reset_onboarding(user_id: str) -> None:
+    """Remove the onboarding flag so /setup can re-run it."""
+    async with get_async_db() as session:
+        await session.execute(
+            delete(UserMemory).where(
+                UserMemory.user_id == user_id,
+                UserMemory.category == "onboarded",
+            )
+        )
 
 
 async def format_user_memory_context(user_id: str) -> str:
