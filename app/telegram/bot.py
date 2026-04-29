@@ -4,9 +4,11 @@ Telegram bot for ClaudBot.
 Run with:  python -m app.telegram.bot
 
 Flow:
-  User message  → submit task → poll every 2s → reply when done
-  waiting_for_input → send question → next user message = answer
-  pending_approval  → send inline Approve / Reject buttons
+  New user    → /start → onboarding conversation (name, nickname, role, tone)
+  Returning   → /start → welcome back by name
+  Any message → submit task → poll → reply when done
+  waiting_for_input → send question → next message = answer
+  pending_approval  → inline Approve / Reject buttons
 """
 import asyncio
 import io
@@ -36,40 +38,41 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 settings = get_settings()
 
-# ── Per-chat state ────────────────────────────────────────────────────────────
-# { chat_id: { "task_id": str, "waiting_for_input": bool, "approval_id": str|None } }
+# ── Per-chat task state ───────────────────────────────────────────────────────
 _state: dict[int, dict] = {}
 
-POLL_INTERVAL = 2   # seconds between status checks
-MAX_POLLS = 300     # 10 minutes max wait
+# ── Onboarding state ──────────────────────────────────────────────────────────
+# {chat_id: {"step": int, "answers": dict}}
+_setup: dict[int, dict] = {}
+
+POLL_INTERVAL = 2
+MAX_POLLS = 300
+
+_SETUP_QUESTIONS = [
+    ("name",     "What's your name?"),
+    ("nickname", "What should I call you? (e.g. Yash, Boss, Chief 😄)"),
+    ("role",     "What's your role? (e.g. entrepreneur, marketer, developer)"),
+    ("tone",     "Preferred tone / language? (e.g. casual English, formal English, Hindi)"),
+]
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _truncate(text: str, limit: int = 4000) -> str:
-    return text if len(text) <= limit else text[:limit] + "\n\n…(truncated)"
-
-
 async def _send_result(chat_id: int, text: str, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send output — as file if it's HTML/very long, otherwise as text."""
-    if text.strip().startswith("<!") or text.strip().startswith("<html"):
+    if text.strip().startswith("<!") or text.strip().lower().startswith("<html"):
         bio = io.BytesIO(text.encode())
         bio.name = "output.html"
         await context.bot.send_document(chat_id=chat_id, document=bio, caption="Website generated")
     elif len(text) > 4000:
-        # Split into chunks
-        chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
-        for chunk in chunks:
+        for chunk in [text[i:i+4000] for i in range(0, len(text), 4000)]:
             await context.bot.send_message(chat_id=chat_id, text=chunk)
     else:
         await context.bot.send_message(chat_id=chat_id, text=text)
 
 
 async def _poll_task(chat_id: int, task_id: str, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Background coroutine: polls task status and sends updates to the user."""
     for _ in range(MAX_POLLS):
         await asyncio.sleep(POLL_INTERVAL)
-
         try:
             task = await get_task(task_id)
         except Exception as exc:
@@ -85,83 +88,122 @@ async def _poll_task(chat_id: int, task_id: str, context: ContextTypes.DEFAULT_T
             return
 
         if status == "waiting_for_input":
-            question = (
-                task.get("pending_approval", {}) or {}
-            ).get("action_summary") or "Please provide more information:"
-            _state[chat_id] = {
-                "task_id": task_id,
-                "waiting_for_input": True,
-                "approval_id": None,
-            }
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"❓ {question}",
-            )
-            return  # stop polling — resume when user replies
+            question = (task.get("pending_approval") or {}).get("action_summary") or "Please provide more information:"
+            _state[chat_id] = {"task_id": task_id, "waiting_for_input": True, "approval_id": None}
+            await context.bot.send_message(chat_id=chat_id, text=f"❓ {question}")
+            return
 
         if status == "pending_approval":
             pa = task.get("pending_approval") or {}
             approval_id = pa.get("approval_id", "")
             summary = pa.get("action_summary", "perform this action")
-            keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("✅ Approve", callback_data=f"approve:{approval_id}"),
-                    InlineKeyboardButton("❌ Reject", callback_data=f"reject:{approval_id}"),
-                ]
-            ])
-            _state[chat_id] = {
-                "task_id": task_id,
-                "waiting_for_input": False,
-                "approval_id": approval_id,
-            }
+            keyboard = InlineKeyboardMarkup([[
+                InlineKeyboardButton("✅ Approve", callback_data=f"approve:{approval_id}"),
+                InlineKeyboardButton("❌ Reject",  callback_data=f"reject:{approval_id}"),
+            ]])
+            _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": approval_id}
             await context.bot.send_message(
                 chat_id=chat_id,
                 text=f"⚠️ Approval required: *{summary}*\nAllow the bot to proceed?",
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=keyboard,
             )
-            return  # stop polling — resume after button press
+            return
 
         if status in ("failed", "rejected", "cancelled"):
-            error = task.get("error") or status
-            await context.bot.send_message(chat_id=chat_id, text=f"❌ Task {status}: {error}")
+            await context.bot.send_message(chat_id=chat_id, text=f"❌ Task {status}: {task.get('error') or status}")
             _state.pop(chat_id, None)
             return
 
-        # still running — keep polling silently
+    await context.bot.send_message(chat_id=chat_id, text="⏱ Task timed out.")
 
-    await context.bot.send_message(chat_id=chat_id, text="⏱ Task timed out. Check status with /status.")
+
+# ── Onboarding ────────────────────────────────────────────────────────────────
+
+async def _ask_setup_question(chat_id: int, step: int, context: ContextTypes.DEFAULT_TYPE) -> None:
+    _, question = _SETUP_QUESTIONS[step]
+    await context.bot.send_message(chat_id=chat_id, text=question)
+
+
+async def _finish_setup(chat_id: int, answers: dict, context: ContextTypes.DEFAULT_TYPE) -> None:
+    uid = str(chat_id)
+    await save_user_memory(uid, f"User's name is {answers['name']}", category="name")
+    await save_user_memory(uid, f"Call the user '{answers['nickname']}'", category="nickname")
+    await save_user_memory(uid, f"User's role is {answers['role']}", category="role")
+    await save_user_memory(uid, f"Preferred tone and language: {answers['tone']}", category="preference")
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=(
+            f"All set, {answers['nickname']}! 🎉\n\n"
+            f"I'll remember:\n"
+            f"• Name: {answers['name']}\n"
+            f"• Role: {answers['role']}\n"
+            f"• Tone: {answers['tone']}\n\n"
+            "Just send me any task or question to get started.\n"
+            "Use /myprofile to see your saved info anytime."
+        ),
+    )
 
 
 # ── Command handlers ──────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text(
-        "👋 Hi! I'm ClaudBot.\n\n"
-        "Just send me any task or question:\n"
-        "• Write a blog post about AI\n"
-        "• Build a website for my brand Nike\n"
-        "• What is machine learning?\n"
-        "• Debug this Python code: ...\n\n"
-        "Commands: /status /cancel /help"
-    )
+    chat_id = update.effective_chat.id
+    uid = str(chat_id)
+
+    memories = await get_user_memories(uid)
+    if memories:
+        # Returning user — find their nickname
+        nickname = next(
+            (m["memory"].split("'")[1] for m in memories if m["category"] == "nickname"),
+            "there",
+        )
+        await update.message.reply_text(
+            f"Welcome back, {nickname}! 👋\n\n"
+            "Just send me any task or question.\n"
+            "/myprofile — view your saved info\n"
+            "/setup — redo your profile\n"
+            "/help — all commands"
+        )
+    else:
+        # New user — start onboarding
+        _setup[chat_id] = {"step": 0, "answers": {}}
+        await update.message.reply_text(
+            "👋 Hi! I'm ClaudBot — your AI assistant.\n\n"
+            "Before we start, let me learn a bit about you. Just a few quick questions!"
+        )
+        await _ask_setup_question(chat_id, 0, context)
+
+
+async def cmd_setup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Redo the onboarding at any time."""
+    chat_id = update.effective_chat.id
+    await clear_user_memories(str(chat_id))
+    _setup[chat_id] = {"step": 0, "answers": {}}
+    await update.message.reply_text("Let's update your profile! Starting fresh.")
+    await _ask_setup_question(chat_id, 0, context)
 
 
 async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "*ClaudBot commands*\n\n"
-        "/start — Introduction\n"
-        "/status — Check current task status\n"
-        "/cancel — Cancel the current task\n"
-        "/help — Show this message\n\n"
+        "/start — Welcome / onboarding\n"
+        "/setup — Redo your profile setup\n"
+        "/myprofile — View your saved info\n"
+        "/remember <fact> — Save something manually\n"
+        "/forget <id> — Delete a memory\n"
+        "/clearprofile — Wipe all memories\n"
+        "/status — Check current task\n"
+        "/cancel — Cancel current task\n"
+        "/help — This message\n\n"
         "*What I can do:*\n"
         "• Answer any question\n"
-        "• Write blog posts, emails, social posts\n"
+        "• Write blogs, emails, social posts\n"
         "• Build websites & landing pages\n"
         "• Generate images\n"
         "• Write & debug code\n"
-        "• Research topics from the web\n"
-        "• Manage brand voices",
+        "• Research topics from the web",
         parse_mode=ParseMode.MARKDOWN,
     )
 
@@ -181,72 +223,54 @@ async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 async def cmd_cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
+    _setup.pop(chat_id, None)
     _state.pop(chat_id, None)
-    await update.message.reply_text("Task cancelled. Send a new message to start fresh.")
+    await update.message.reply_text("Cancelled. Send a new message to start fresh.")
 
 
 # ── User memory commands ──────────────────────────────────────────────────────
 
 async def cmd_remember(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Save a personal memory. Usage: /remember I prefer formal English"""
     chat_id = update.effective_chat.id
     text = " ".join(context.args).strip() if context.args else ""
     if not text:
-        await update.message.reply_text(
-            "Usage: /remember <anything>\n"
-            "Examples:\n"
-            "• /remember My name is Yash\n"
-            "• /remember I always want formal English\n"
-            "• /remember I work with Nike and Adidas brands"
-        )
+        await update.message.reply_text("Usage: /remember <anything>\nExample: /remember I prefer bullet points")
         return
     await save_user_memory(str(chat_id), text)
     await update.message.reply_text(f"✅ Remembered: {text}")
 
 
 async def cmd_myprofile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show all saved memories for this user."""
     chat_id = update.effective_chat.id
     memories = await get_user_memories(str(chat_id))
     if not memories:
-        await update.message.reply_text(
-            "No memories saved yet.\nUse /remember <fact> to save something."
-        )
+        await update.message.reply_text("No profile yet. Use /setup to create one.")
         return
-
     lines = [f"`{m['id'][:8]}` [{m['category']}] {m['memory']}" for m in memories]
-    text = "🧠 *Your memory profile:*\n\n" + "\n".join(lines)
-    text += "\n\nTo delete one: /forget <first 8 chars of ID>"
+    text = "🧠 *Your profile:*\n\n" + "\n".join(lines)
+    text += "\n\n/forget <id> to remove one • /setup to redo"
     await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_forget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Delete a specific memory. Usage: /forget <memory-id>"""
     chat_id = update.effective_chat.id
     if not context.args:
         await update.message.reply_text("Usage: /forget <memory-id>\nSee IDs with /myprofile")
         return
-
     partial_id = context.args[0].strip()
     memories = await get_user_memories(str(chat_id))
     match = next((m for m in memories if m["id"].startswith(partial_id)), None)
-
     if not match:
-        await update.message.reply_text(f"No memory found with ID starting with `{partial_id}`", parse_mode=ParseMode.MARKDOWN)
+        await update.message.reply_text(f"No memory found with ID `{partial_id}`", parse_mode=ParseMode.MARKDOWN)
         return
-
-    deleted = await delete_user_memory(match["id"], str(chat_id))
-    if deleted:
+    if await delete_user_memory(match["id"], str(chat_id)):
         await update.message.reply_text(f"🗑 Forgotten: {match['memory']}")
-    else:
-        await update.message.reply_text("Could not delete that memory.")
 
 
 async def cmd_clearprofile(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Clear all memories for this user."""
     chat_id = update.effective_chat.id
     count = await clear_user_memories(str(chat_id))
-    await update.message.reply_text(f"🗑 Cleared {count} memories. Starting fresh.")
+    await update.message.reply_text(f"🗑 Cleared {count} memories.")
 
 
 # ── Message handler ───────────────────────────────────────────────────────────
@@ -254,9 +278,25 @@ async def cmd_clearprofile(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
-    state = _state.get(chat_id)
 
-    # Resume a waiting_for_input task with the user's answer
+    # ── Onboarding in progress ───────────────────────────────────────────────
+    if chat_id in _setup:
+        setup = _setup[chat_id]
+        step = setup["step"]
+        key, _ = _SETUP_QUESTIONS[step]
+        setup["answers"][key] = text
+        step += 1
+        setup["step"] = step
+
+        if step < len(_SETUP_QUESTIONS):
+            await _ask_setup_question(chat_id, step, context)
+        else:
+            _setup.pop(chat_id)
+            await _finish_setup(chat_id, setup["answers"], context)
+        return
+
+    # ── Resume waiting_for_input task ────────────────────────────────────────
+    state = _state.get(chat_id)
     if state and state.get("waiting_for_input"):
         task_id = state["task_id"]
         await update.message.reply_text("Got it, resuming…")
@@ -265,10 +305,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": None}
             asyncio.create_task(_poll_task(chat_id, task_id, context))
         except Exception as exc:
-            await update.message.reply_text(f"❌ Error submitting answer: {exc}")
+            await update.message.reply_text(f"❌ Error: {exc}")
         return
 
-    # New task
+    # ── New task ─────────────────────────────────────────────────────────────
     await update.message.reply_text("⏳ Working on it…")
     try:
         task_id = await submit_task(text, created_by=str(chat_id), user_id=str(chat_id))
@@ -278,13 +318,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text(f"❌ Failed to submit task: {exc}")
 
 
-# ── Inline keyboard callback (approve / reject) ───────────────────────────────
+# ── Inline keyboard callback ──────────────────────────────────────────────────
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
     chat_id = update.effective_chat.id
-
     action, approval_id = query.data.split(":", 1)
     state = _state.get(chat_id, {})
     task_id = state.get("task_id")
@@ -292,7 +331,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     try:
         if action == "approve":
             await approve(approval_id, approved_by=str(chat_id))
-            await query.edit_message_text("✅ Approved. Resuming task…")
+            await query.edit_message_text("✅ Approved. Resuming…")
             if task_id:
                 _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": None}
                 asyncio.create_task(_poll_task(chat_id, task_id, context))
@@ -311,19 +350,16 @@ def main() -> None:
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is not set in .env")
 
-    app = (
-        Application.builder()
-        .token(token)
-        .build()
-    )
+    app = Application.builder().token(token).build()
 
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler("help", cmd_help))
-    app.add_handler(CommandHandler("status", cmd_status))
-    app.add_handler(CommandHandler("cancel", cmd_cancel))
-    app.add_handler(CommandHandler("remember", cmd_remember))
-    app.add_handler(CommandHandler("myprofile", cmd_myprofile))
-    app.add_handler(CommandHandler("forget", cmd_forget))
+    app.add_handler(CommandHandler("start",        cmd_start))
+    app.add_handler(CommandHandler("setup",        cmd_setup))
+    app.add_handler(CommandHandler("help",         cmd_help))
+    app.add_handler(CommandHandler("status",       cmd_status))
+    app.add_handler(CommandHandler("cancel",       cmd_cancel))
+    app.add_handler(CommandHandler("remember",     cmd_remember))
+    app.add_handler(CommandHandler("myprofile",    cmd_myprofile))
+    app.add_handler(CommandHandler("forget",       cmd_forget))
     app.add_handler(CommandHandler("clearprofile", cmd_clearprofile))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
