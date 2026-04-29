@@ -87,11 +87,11 @@ TOOL_TIERS: dict[str, Optional[str]] = {
 }
 
 _ROUTER_SYSTEM = """\
-You are an LLM routing agent. Pick the best performance tier for the given tool call.
+You are an LLM routing agent. Pick the best tier AND quality level for the given tool call.
 
 Tier definitions:
-  strong   – Most capable and expensive. For: complex algorithms, multi-step debugging,
-             architectural analysis, tasks needing deep reasoning chains (>500-token outputs).
+  strong   – Most capable. For: complex algorithms, multi-step debugging, architectural
+             analysis, tasks needing deep reasoning chains (>500-token outputs).
   creative – Creative + reasoning balance. For: marketing copy, web pages, brand-aware
              long-form writing, persuasive content.
   standard – Reliable general-purpose. For: documents, summaries, simple code,
@@ -99,8 +99,13 @@ Tier definitions:
   fast     – Cheap and quick. For: content under ~200 words, social posts, simple
              reformatting, short factual answers.
 
+Quality level (determines which model within the tier to start from):
+  high   – Use the most capable model in the tier. For: complex, nuanced, long outputs.
+  medium – Use a mid-tier model. For: moderate complexity, standard length.
+  low    – Use the cheapest model in the tier. For: simple, short, or repetitive tasks.
+
 Return ONLY a valid JSON object – no markdown fences, no explanation outside it:
-{"tier": "<strong|creative|standard|fast>", "reason": "<one sentence>"}
+{"tier": "<strong|creative|standard|fast>", "quality": "<high|medium|low>", "reason": "<one sentence>"}
 """
 
 
