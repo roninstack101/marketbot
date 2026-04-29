@@ -30,6 +30,8 @@ if settings.anthropic_api_key:
     os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
 if settings.google_api_key:
     os.environ["GEMINI_API_KEY"] = settings.google_api_key
+if settings.nvidia_nim_api_key:
+    os.environ["NVIDIA_NIM_API_KEY"] = settings.nvidia_nim_api_key
 
 # Silence litellm's verbose default logging
 litellm.set_verbose = False
