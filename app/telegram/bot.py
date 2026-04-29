@@ -321,6 +321,10 @@ def main() -> None:
     app.add_handler(CommandHandler("help", cmd_help))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("cancel", cmd_cancel))
+    app.add_handler(CommandHandler("remember", cmd_remember))
+    app.add_handler(CommandHandler("myprofile", cmd_myprofile))
+    app.add_handler(CommandHandler("forget", cmd_forget))
+    app.add_handler(CommandHandler("clearprofile", cmd_clearprofile))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_callback))
 
