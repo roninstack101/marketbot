@@ -89,6 +89,7 @@ compiled_graph = build_graph().compile()
 async def run_agent(
     task_id: str,
     user_task: str,
+    user_id: str = "",
     existing_state: dict | None = None,
 ) -> AgentState:
     """
