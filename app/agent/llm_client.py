@@ -15,10 +15,10 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from app.config import get_settings
 from app.logging_config import get_logger
 
-# Set by the executor before each tool call via llm_router.active_model.
-# call_llm reads this so every tool automatically uses the routed model
-# without needing its own model parameter.
-active_model: ContextVar[Optional[str]] = ContextVar("active_model", default=None)
+# Set by the executor before each tool call via llm_router.
+# Holds an ordered list: primary model first, fallbacks after.
+# call_llm tries each in order on quota/rate-limit errors.
+active_model: ContextVar[Optional[list[str]]] = ContextVar("active_model", default=None)
 
 log = get_logger(__name__)
 settings = get_settings()
