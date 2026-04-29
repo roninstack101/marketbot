@@ -48,6 +48,7 @@ async def submit_task(
         task_id=task_id,
         user_task=payload.user_task,
         created_by=payload.created_by,
+        user_id=payload.user_id or payload.created_by or "",
     )
 
     log.info("task_submitted", task_id=task_id, user=payload.created_by)
