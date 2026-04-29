@@ -229,10 +229,17 @@ async def route_llm(
         settings.llm_model_strong or settings.llm_model_creative or settings.llm_model_fast
     )
     if settings.llm_router_enabled and multiple_tiers_configured:
-        tier = await _ai_route(tool_name, tool_input, task_description, default_tier)
+        tier, quality = await _ai_route(tool_name, tool_input, task_description, default_tier)
     else:
-        tier = default_tier
+        tier, quality = default_tier, "high"
 
-    models = _tier_to_models(tier)
-    log.info("llm_router_decision", tool=tool_name, tier=tier, primary=models[0], fallbacks=len(models) - 1)
+    models = _tier_to_models(tier, quality)
+    log.info(
+        "llm_router_decision",
+        tool=tool_name,
+        tier=tier,
+        quality=quality,
+        primary=models[0],
+        fallbacks=len(models) - 1,
+    )
     return models
