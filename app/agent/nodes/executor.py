@@ -173,7 +173,8 @@ async def executor_node(state: AgentState) -> dict:
 
     try:
         output = await tool_fn(**resolved_input)
-        log.info("step_success", task_id=task_id, step=step_number, tool=tool_name, model=routed_model or "default")
+        primary = routed_model[0] if routed_model else "default"
+        log.info("step_success", task_id=task_id, step=step_number, tool=tool_name, model=primary)
         result = StepResult(
             step_number=step_number,
             tool_name=tool_name,
