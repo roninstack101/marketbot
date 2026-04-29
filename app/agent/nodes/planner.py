@@ -10,6 +10,7 @@ from app.agent.llm_client import call_llm_json
 from app.agent.prompts.planner import PLANNER_HUMAN, PLANNER_SYSTEM
 from app.agent.state import AgentState
 from app.memory.store import retrieve_relevant_memories
+from app.memory.user_store import format_user_memory_context
 
 log = structlog.get_logger(__name__)
 
