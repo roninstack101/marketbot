@@ -155,9 +155,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     uid = str(chat_id)
 
-    memories = await get_user_memories(uid)
-    if memories:
-        # Returning user — find their nickname
+    if await is_onboarded(uid):
+        # Returning user
+        memories = await get_user_memories(uid)
         nickname = next(
             (m["memory"].split("'")[1] for m in memories if m["category"] == "nickname"),
             "there",
@@ -170,7 +170,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "/help — all commands"
         )
     else:
-        # New user — start onboarding
+        # First-time user — start onboarding once
         _setup[chat_id] = {"step": 0, "answers": {}}
         await update.message.reply_text(
             "👋 Hi! I'm ClaudBot — your AI assistant.\n\n"
