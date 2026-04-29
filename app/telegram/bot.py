@@ -284,6 +284,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     chat_id = update.effective_chat.id
     text = update.message.text.strip()
 
+    # ── Not onboarded yet — force /start first ──────────────────────────────
+    if chat_id not in _setup and not await is_onboarded(str(chat_id)):
+        await update.message.reply_text(
+            "👋 Hey! Send /start first so I can set up your profile."
+        )
+        return
+
     # ── Onboarding in progress ───────────────────────────────────────────────
     if chat_id in _setup:
         setup = _setup[chat_id]
