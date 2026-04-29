@@ -18,19 +18,30 @@ log = structlog.get_logger(__name__)
 async def planner_node(state: AgentState) -> dict:
     task_id = state["task_id"]
     user_task = state["user_task"]
+    user_id = state.get("user_id", "")
 
-    log.info("planner_start", task_id=task_id)
+    log.info("planner_start", task_id=task_id, user_id=user_id or "anonymous")
 
-    # ── Retrieve memory context ───────────────────────────────────────────────
+    # ── Retrieve task memory context ──────────────────────────────────────────
     try:
         memories = await retrieve_relevant_memories(user_task, limit=3)
-        memory_context = "\n\n".join(
+        task_memory = "\n\n".join(
             f"Task: {m['task_summary']}\nOutcome: {m['output_summary']}"
             for m in memories
         ) or "No relevant past tasks found."
     except Exception as exc:
         log.warning("memory_retrieval_failed", error=str(exc))
-        memory_context = "Memory unavailable."
+        task_memory = "Memory unavailable."
+
+    # ── Retrieve user memory context ──────────────────────────────────────────
+    user_memory = ""
+    if user_id:
+        try:
+            user_memory = await format_user_memory_context(user_id)
+        except Exception as exc:
+            log.warning("user_memory_retrieval_failed", error=str(exc))
+
+    memory_context = "\n\n".join(filter(None, [user_memory, task_memory]))
 
     # ── Call LLM ─────────────────────────────────────────────────────────────
     messages = [
