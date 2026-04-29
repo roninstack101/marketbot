@@ -105,6 +105,23 @@ class Memory(Base):
     )
 
 
+class UserMemory(Base):
+    """Per-user persistent memory — one row per remembered fact."""
+
+    __tablename__ = "user_memories"
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False), primary_key=True, default=_uuid
+    )
+    user_id: Mapped[str] = mapped_column(String(200), nullable=False, index=True)
+    category: Mapped[str] = mapped_column(String(50), default="fact")
+    memory: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_now
+    )
+
+
 class BrandVoice(Base):
     """Persistent brand identity profiles for multi-brand content generation."""
 
