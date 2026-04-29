@@ -16,10 +16,8 @@ class TaskCreate(BaseModel):
         description="Natural language description of the task to execute",
         examples=["Write a Q2 email campaign for our summer sale"],
     )
-    created_by: Optional[str] = Field(
-        None,
-        description="Identifier of the user or system submitting the task",
-    )
+    created_by: Optional[str] = Field(None, description="Identifier of the user or system submitting the task")
+    user_id: Optional[str] = Field(None, description="User identifier for personal memory lookup")
 
 
 class TaskResponse(BaseModel):
