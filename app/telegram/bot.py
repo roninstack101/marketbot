@@ -30,6 +30,9 @@ from app.memory.user_store import (
     clear_user_memories,
     delete_user_memory,
     get_user_memories,
+    is_onboarded,
+    mark_onboarded,
+    reset_onboarding,
     save_user_memory,
 )
 from app.telegram.api import approve, get_task, reject, respond_to_task, submit_task
