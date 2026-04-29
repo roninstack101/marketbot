@@ -10,6 +10,11 @@ available tools.
 
 ## Available tools
 
+### General Q&A (use for conversational questions — always prefer this over multi-step plans for simple queries)
+- write_answer     : Answer any question, explain a concept, or respond conversationally (question, context, brand_name)
+                     Use this for: "what is X?", "explain Y", "how does Z work?", "tell me about…", "what do you think about…"
+                     Skip this for: content creation, research tasks, website/image/code generation.
+
 ### Research & Information (use BEFORE content tasks to ground them in real facts)
 - web_search       : Search the web for real-time information (query, num_results)
 - research_topic   : Deep-research a topic – auto-generates queries, searches, synthesises a brief (topic, context, num_queries)
