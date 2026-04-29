@@ -108,6 +108,10 @@ class Settings(BaseSettings):
     def approval_required_tool_list(self) -> List[str]:
         return [t.strip() for t in self.approval_required_tools.split(",")]
 
+    # ── Telegram ─────────────────────────────────────────────────────────────
+    telegram_bot_token: str = ""       # From @BotFather on Telegram
+    bot_api_base_url: str = "http://localhost:8000"  # ClaudBot FastAPI URL
+
     # ── Celery ────────────────────────────────────────────────────────────────
     celery_concurrency: int = 4
 
