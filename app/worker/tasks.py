@@ -49,7 +49,7 @@ def execute_task(self, task_id: str, user_task: str, created_by: str | None = No
         from app.agent.graph import run_agent
 
         # Run the async graph in this sync Celery worker context
-        final_state = asyncio.run(run_agent(task_id=task_id, user_task=user_task))
+        final_state = asyncio.run(run_agent(task_id=task_id, user_task=user_task, user_id=user_id))
 
     except Exception as exc:
         log.error("worker_task_error", task_id=task_id, error=str(exc), exc_info=True)
