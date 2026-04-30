@@ -67,9 +67,10 @@ async def chat(payload: ChatRequest):
 
         log.info("chat_request", models=fast_models, user_id=payload.user_id)
 
-        # Try each model in order; skip on rate-limit or bad-request errors.
+        # Try each model in order; skip on any per-model error.
         _skip = (litellm.RateLimitError, litellm.BadRequestError,
-                 litellm.ServiceUnavailableError, litellm.APIConnectionError)
+                 litellm.NotFoundError, litellm.ServiceUnavailableError,
+                 litellm.APIConnectionError)
         last_error: Exception = RuntimeError("No models available")
         reply = None
         for model in fast_models:
