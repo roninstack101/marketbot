@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     llm_router_enabled: bool = True   # Enable AI-assisted tier selection
     llm_router_model: str = ""        # Model used for routing decisions (defaults to llm_model_fast)
 
+    # ── Groq ─────────────────────────────────────────────────────────────────
+    groq_api_key: str = ""         # Get from console.groq.com (free, fast)
+
     # ── NVIDIA NIM ───────────────────────────────────────────────────────────
     nvidia_nim_api_key: str = ""   # Get from build.nvidia.com
 
