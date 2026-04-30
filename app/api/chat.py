@@ -56,23 +56,25 @@ async def chat(payload: ChatRequest):
 
         system = _SYSTEM if not user_context else f"{_SYSTEM}\n\n{user_context}"
 
-        fast_model = (
-            settings.llm_model_fast_list[0]
-            if settings.llm_model_fast_list
-            else settings.llm_model
-        )
+        # Build fallback chain: fast tier → standard model as final fallback
+        fast_models = settings.llm_model_fast_list or settings.llm_model_list
+        if settings.llm_model not in fast_models:
+            fast_models = list(fast_models) + [settings.llm_model]
 
-        log.info("chat_request", model=fast_model, user_id=payload.user_id)
+        log.info("chat_request", models=fast_models, user_id=payload.user_id)
 
-        reply = await call_llm(
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": payload.message},
-            ],
-            model=fast_model,
-            temperature=0.7,
-            max_tokens=1024,
-        )
+        token = active_model.set(fast_models)
+        try:
+            reply = await call_llm(
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": payload.message},
+                ],
+                temperature=0.7,
+                max_tokens=1024,
+            )
+        finally:
+            active_model.reset(token)
 
         return ChatResponse(reply=reply)
 
