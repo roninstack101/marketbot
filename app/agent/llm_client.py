@@ -61,6 +61,7 @@ async def call_llm(
     model: str | None = None,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    num_retries: int | None = None,
 ) -> str:
     """
     Call the LLM and return the raw text content of the first choice.
