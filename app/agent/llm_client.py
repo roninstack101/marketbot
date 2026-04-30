@@ -30,6 +30,8 @@ if settings.anthropic_api_key:
     os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
 if settings.google_api_key:
     os.environ["GEMINI_API_KEY"] = settings.google_api_key
+if settings.groq_api_key:
+    os.environ["GROQ_API_KEY"] = settings.groq_api_key
 if settings.nvidia_nim_api_key:
     os.environ["NVIDIA_NIM_API_KEY"] = settings.nvidia_nim_api_key
 
