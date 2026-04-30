@@ -61,6 +61,7 @@ app.include_router(tasks_router, prefix="/api/v1")
 app.include_router(approvals_router, prefix="/api/v1")
 app.include_router(history_router, prefix="/api/v1")
 app.include_router(brands_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
