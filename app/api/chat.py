@@ -54,7 +54,10 @@ async def chat(payload: ChatRequest):
         if payload.user_id:
             user_context = await format_user_memory_context(payload.user_id)
 
+        # Merge system prompt + user context into the user message so it works
+        # with models that don't support the system role (e.g. Gemma via Google AI Studio).
         system = _SYSTEM if not user_context else f"{_SYSTEM}\n\n{user_context}"
+        full_message = f"{system}\n\n---\nUser: {payload.message}"
 
         # Build fallback chain: fast tier → standard model as final fallback
         fast_models = settings.llm_model_fast_list or settings.llm_model_list
@@ -66,10 +69,7 @@ async def chat(payload: ChatRequest):
         token = active_model.set(fast_models)
         try:
             reply = await call_llm(
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": payload.message},
-                ],
+                messages=[{"role": "user", "content": full_message}],
                 temperature=0.7,
                 max_tokens=1024,
             )
