@@ -62,6 +62,105 @@ _SETUP_QUESTIONS = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _format_tool_output(text: str) -> str:
+    """
+    If text is a raw JSON tool output, convert it to readable Telegram Markdown.
+    Falls back to the original text if it's not JSON or doesn't match known schemas.
+    """
+    stripped = text.strip()
+    if not (stripped.startswith("{") or stripped.startswith("[")):
+        return text
+
+    try:
+        data = json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        return text
+
+    if not isinstance(data, dict):
+        return text
+
+    parts: list[str] = []
+
+    # ── research_topic ────────────────────────────────────────────────────────
+    if "brief" in data and "key_facts" in data:
+        topic = data.get("topic", "")
+        if topic:
+            parts.append(f"*{topic}*\n")
+
+        # The brief field already has markdown — use it directly
+        brief = data.get("brief", "").strip()
+        if brief:
+            # Strip any leading ## / ### markdown headers (Telegram ignores them)
+            brief = "\n".join(
+                line.lstrip("#").strip() if line.startswith("#") else line
+                for line in brief.splitlines()
+            )
+            parts.append(brief)
+
+        sources = data.get("sources", [])
+        if sources:
+            parts.append("\n*Sources*")
+            for s in sources[:6]:
+                title = s.get("title", "")
+                url = s.get("url", "")
+                if title and url:
+                    parts.append(f"- [{title}]({url})")
+                elif title:
+                    parts.append(f"- {title}")
+        return "\n".join(parts)
+
+    # ── write_document / write_blog_post / write_seo_content ──────────────────
+    if "content" in data:
+        title = data.get("title", "")
+        if title:
+            parts.append(f"*{title}*\n")
+        content = data.get("content", "").strip()
+        # Strip ## / ### headings
+        content = "\n".join(
+            line.lstrip("#").strip() if line.startswith("#") else line
+            for line in content.splitlines()
+        )
+        parts.append(content)
+        takeaways = data.get("key_takeaways", [])
+        if takeaways:
+            parts.append("\n*Key Takeaways*")
+            for t in takeaways:
+                parts.append(f"- {t}")
+        return "\n".join(parts)
+
+    # ── generate_campaign / write_email ──────────────────────────────────────
+    if "subject" in data and "body" in data:
+        parts.append(f"*Subject:* {data['subject']}\n")
+        parts.append(data.get("body", ""))
+        cta = data.get("cta", "")
+        if cta:
+            parts.append(f"\n*CTA:* {cta}")
+        return "\n".join(parts)
+
+    # ── write_social_post ─────────────────────────────────────────────────────
+    if "post" in data:
+        platform = data.get("platform", "")
+        if platform:
+            parts.append(f"*{platform} Post*\n")
+        parts.append(data.get("post", ""))
+        hashtags = data.get("hashtags", [])
+        if hashtags:
+            parts.append("\n" + " ".join(f"#{h}" for h in hashtags))
+        return "\n".join(parts)
+
+    # ── write_code / debug_code / explain_code ────────────────────────────────
+    if "code" in data:
+        lang = data.get("language", "")
+        explanation = data.get("explanation", "")
+        if explanation:
+            parts.append(explanation + "\n")
+        parts.append(f"```{lang}\n{data['code']}\n```")
+        return "\n".join(parts)
+
+    # ── Fallback: unknown JSON — return as-is ─────────────────────────────────
+    return text
+
+
 async def _send_result(chat_id: int, text: str, context: ContextTypes.DEFAULT_TYPE) -> None:
     if text.strip().startswith("<!") or text.strip().lower().startswith("<html"):
         bio = io.BytesIO(text.encode())
