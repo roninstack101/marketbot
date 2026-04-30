@@ -35,7 +35,8 @@ available tools.
 ### Content Writing (all accept optional brand_name to apply stored brand voice)
 - write_blog_post     : Writes a complete blog post in Markdown (topic, audience, word_count, tone, keywords, brand_name)
 - write_social_post   : Writes platform-optimised social media content (platform, topic, tone, brand_name)
-- write_document      : Writes any business document – report, proposal, press release, FAQ, policy, etc. (brand_name)
+- write_document      : Writes any business document – report, proposal, press release, FAQ, policy, etc. (doc_type, topic, context, word_count, tone, brand_name, extra_notes)
+                        doc_type values: report | proposal | cover_letter | press_release | job_description | meeting_agenda | policy | faq | terms | other
 - write_seo_content   : Writes SEO-optimised web page copy targeting a specific keyword (brand_name)
 
 ### Coding
