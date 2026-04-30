@@ -66,11 +66,17 @@ async def _send_result(chat_id: int, text: str, context: ContextTypes.DEFAULT_TY
         bio = io.BytesIO(text.encode())
         bio.name = "output.html"
         await context.bot.send_document(chat_id=chat_id, document=bio, caption="Website generated")
-    elif len(text) > 4000:
-        for chunk in [text[i:i+4000] for i in range(0, len(text), 4000)]:
+        return
+
+    chunks = [text[i:i+4000] for i in range(0, len(text), 4000)]
+    for chunk in chunks:
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id, text=chunk, parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            # Fall back to plain text if markdown parsing fails
             await context.bot.send_message(chat_id=chat_id, text=chunk)
-    else:
-        await context.bot.send_message(chat_id=chat_id, text=text)
 
 
 async def _poll_task(chat_id: int, task_id: str, context: ContextTypes.DEFAULT_TYPE) -> None:
