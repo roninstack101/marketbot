@@ -49,26 +49,36 @@ class ChatResponse(BaseModel):
 
 @router.post("", response_model=ChatResponse)
 async def chat(payload: ChatRequest):
-    user_context = ""
-    if payload.user_id:
-        user_context = await format_user_memory_context(payload.user_id)
+    try:
+        user_context = ""
+        if payload.user_id:
+            user_context = await format_user_memory_context(payload.user_id)
 
-    system = _SYSTEM if not user_context else f"{_SYSTEM}\n\n{user_context}"
+        system = _SYSTEM if not user_context else f"{_SYSTEM}\n\n{user_context}"
 
-    fast_model = (
-        settings.llm_model_fast_list[0]
-        if settings.llm_model_fast_list
-        else settings.llm_model
-    )
+        fast_model = (
+            settings.llm_model_fast_list[0]
+            if settings.llm_model_fast_list
+            else settings.llm_model
+        )
 
-    reply = await call_llm(
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": payload.message},
-        ],
-        model=fast_model,
-        temperature=0.7,
-        max_tokens=1024,
-    )
+        log.info("chat_request", model=fast_model, user_id=payload.user_id)
 
-    return ChatResponse(reply=reply)
+        reply = await call_llm(
+            messages=[
+                {"role": "system", "content": system},
+                {"role": "user", "content": payload.message},
+            ],
+            model=fast_model,
+            temperature=0.7,
+            max_tokens=1024,
+        )
+
+        return ChatResponse(reply=reply)
+
+    except Exception as exc:
+        log.error("chat_error", error=str(exc), trace=traceback.format_exc())
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(exc)},
+        )
