@@ -79,6 +79,7 @@ async def chat(payload: ChatRequest):
                     model=model,
                     temperature=0.7,
                     max_tokens=1024,
+                    num_retries=0,
                 )
                 break
             except _skip as exc:
