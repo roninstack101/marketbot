@@ -138,7 +138,7 @@ def resume_task(self, task_id: str, approved_by: str):
     status = final_state.get("status", "complete")
     updates = {
         "status": status,
-        "step_results": json.dumps(final_state.get("step_results", [])),
+        "step_results": final_state.get("step_results", []),
         "final_output": final_state.get("final_output", ""),
         "critique": final_state.get("critique"),
         "error": "; ".join(final_state.get("errors", [])) or None,
