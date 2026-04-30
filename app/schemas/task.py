@@ -37,6 +37,16 @@ class TaskResponse(BaseModel):
 
     model_config = {"from_attributes": True}
 
+    @field_validator("plan", "step_results", mode="before")
+    @classmethod
+    def parse_json_string(cls, v):
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return None
+        return v
+
 
 class TaskStatusResponse(BaseModel):
     id: str
