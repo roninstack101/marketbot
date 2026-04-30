@@ -85,7 +85,7 @@ async def call_llm(
                 messages=messages,
                 temperature=temperature if temperature is not None else settings.llm_temperature,
                 max_tokens=max_tokens or settings.llm_max_tokens,
-                num_retries=settings.llm_max_retries,
+                num_retries=num_retries if num_retries is not None else settings.llm_max_retries,
             )
 
             extra = _extra_body_for(attempt_model)
