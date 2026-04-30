@@ -392,6 +392,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start",        cmd_start))
     app.add_handler(CommandHandler("setup",        cmd_setup))
     app.add_handler(CommandHandler("help",         cmd_help))
+    app.add_handler(CommandHandler("task",         cmd_task))
     app.add_handler(CommandHandler("status",       cmd_status))
     app.add_handler(CommandHandler("cancel",       cmd_cancel))
     app.add_handler(CommandHandler("remember",     cmd_remember))
