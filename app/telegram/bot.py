@@ -213,6 +213,33 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def cmd_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Submit a task to the full agent pipeline (with tools)."""
+    chat_id = update.effective_chat.id
+    text = " ".join(context.args).strip() if context.args else ""
+    if not text:
+        await update.message.reply_text(
+            "Usage: /task <your request>\n\n"
+            "Example:\n"
+            "/task write an email campaign for our summer sale\n"
+            "/task build a landing page for my coffee shop\n"
+            "/task research competitors in the fitness app market"
+        )
+        return
+
+    if len(text) < 5:
+        await update.message.reply_text("Please describe your task in at least 5 characters.")
+        return
+
+    await update.message.reply_text("⏳ Submitting task to agent…")
+    try:
+        task_id = await submit_task(text, created_by=str(chat_id), user_id=str(chat_id))
+        _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": None}
+        asyncio.create_task(_poll_task(chat_id, task_id, context))
+    except Exception as exc:
+        await update.message.reply_text(f"❌ Failed to submit task: {exc}")
+
+
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     chat_id = update.effective_chat.id
     state = _state.get(chat_id)
