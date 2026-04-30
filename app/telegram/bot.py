@@ -199,16 +199,16 @@ async def cmd_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/remember <fact> — Save something manually\n"
         "/forget <id> — Delete a memory\n"
         "/clearprofile — Wipe all memories\n"
+        "/task <request> — Run a task with full tools\n"
         "/status — Check current task\n"
         "/cancel — Cancel current task\n"
         "/help — This message\n\n"
-        "*What I can do:*\n"
-        "• Answer any question\n"
-        "• Write blogs, emails, social posts\n"
-        "• Build websites & landing pages\n"
-        "• Generate images\n"
-        "• Write & debug code\n"
-        "• Research topics from the web",
+        "*How it works:*\n"
+        "• Just chat normally for quick answers\n"
+        "• Use /task for tool-powered operations:\n"
+        "  /task write an email campaign for summer sale\n"
+        "  /task build a landing page for my SaaS\n"
+        "  /task research competitors in the coffee market",
         parse_mode=ParseMode.MARKDOWN,
     )
 
