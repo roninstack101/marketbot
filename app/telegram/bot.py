@@ -320,14 +320,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             await update.message.reply_text(f"❌ Error: {exc}")
         return
 
-    # ── New task ─────────────────────────────────────────────────────────────
-    await update.message.reply_text("⏳ Working on it…")
+    # ── Chat (default) ───────────────────────────────────────────────────────
     try:
-        task_id = await submit_task(text, created_by=str(chat_id), user_id=str(chat_id))
-        _state[chat_id] = {"task_id": task_id, "waiting_for_input": False, "approval_id": None}
-        asyncio.create_task(_poll_task(chat_id, task_id, context))
+        reply = await api_chat(text, user_id=str(chat_id))
+        await _send_result(chat_id, reply, context)
     except Exception as exc:
-        await update.message.reply_text(f"❌ Failed to submit task: {exc}")
+        await update.message.reply_text(f"❌ Error: {exc}")
 
 
 # ── Inline keyboard callback ──────────────────────────────────────────────────
