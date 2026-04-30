@@ -8,12 +8,18 @@ POST /api/v1/chat
 No Celery, no polling. For quick conversational responses.
 Use the task pipeline (/tasks) for tool-based operations.
 """
+import traceback
+
 from pydantic import BaseModel, Field
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from app.agent.llm_client import call_llm
 from app.config import get_settings
+from app.logging_config import get_logger
 from app.memory.user_store import format_user_memory_context
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 settings = get_settings()
