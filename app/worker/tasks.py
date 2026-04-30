@@ -68,8 +68,8 @@ def execute_task(self, task_id: str, user_task: str, created_by: str | None = No
 
     updates = {
         "status": status,
-        "plan": json.dumps(final_state.get("plan", [])),
-        "step_results": json.dumps(final_state.get("step_results", [])),
+        "plan": final_state.get("plan", []),
+        "step_results": final_state.get("step_results", []),
         "final_output": final_state.get("final_output", ""),
         "critique": final_state.get("critique"),
         "error": "; ".join(final_state.get("errors", [])) or None,
