@@ -35,7 +35,7 @@ from app.memory.user_store import (
     reset_onboarding,
     save_user_memory,
 )
-from app.telegram.api import approve, get_task, reject, respond_to_task, submit_task
+from app.telegram.api import approve, chat as api_chat, get_task, reject, respond_to_task, submit_task
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
