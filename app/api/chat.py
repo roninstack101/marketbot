@@ -67,15 +67,27 @@ async def chat(payload: ChatRequest):
 
         log.info("chat_request", models=fast_models, user_id=payload.user_id)
 
-        token = active_model.set(fast_models)
-        try:
-            reply = await call_llm(
-                messages=[{"role": "user", "content": full_message}],
-                temperature=0.7,
-                max_tokens=1024,
-            )
-        finally:
-            active_model.reset(token)
+        # Try each model in order; skip on rate-limit or bad-request errors.
+        _skip = (litellm.RateLimitError, litellm.BadRequestError,
+                 litellm.ServiceUnavailableError, litellm.APIConnectionError)
+        last_error: Exception = RuntimeError("No models available")
+        reply = None
+        for model in fast_models:
+            try:
+                reply = await call_llm(
+                    messages=[{"role": "user", "content": full_message}],
+                    model=model,
+                    temperature=0.7,
+                    max_tokens=1024,
+                )
+                break
+            except _skip as exc:
+                log.warning("chat_model_skip", model=model, error=str(exc))
+                last_error = exc
+                continue
+
+        if reply is None:
+            raise last_error
 
         return ChatResponse(reply=reply)
 
