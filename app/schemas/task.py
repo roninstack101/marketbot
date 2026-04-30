@@ -1,10 +1,11 @@
 """
 Pydantic v2 request/response schemas for the API layer.
 """
+import json
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ── Task ──────────────────────────────────────────────────────────────────────
