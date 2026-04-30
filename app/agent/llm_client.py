@@ -41,6 +41,7 @@ _FALLBACK_ERRORS = (
     litellm.RateLimitError,
     litellm.ServiceUnavailableError,
     litellm.APIConnectionError,
+    litellm.NotFoundError,
 )
 
 # Models that support extended thinking via extra_body
